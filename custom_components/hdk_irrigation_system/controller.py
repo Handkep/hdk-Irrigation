@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from datetime import datetime, time, timedelta
 import logging
 from typing import Any
@@ -12,6 +13,7 @@ from homeassistant.core import HomeAssistant
 from .const import DOMAIN, VERSION
 
 _LOGGER = logging.getLogger(__name__)
+_LOGGER.setLevel(10)
 
 
 class Controller:
@@ -145,6 +147,7 @@ class Cycle:
         cycle_start_time: time,
         # zones: list,
     ) -> None:
+        """Initialize an irrigation cycle."""
         self._id = cycleid
         self.name = name
         self._start_time = cycle_start_time
@@ -162,12 +165,17 @@ class Cycle:
 
     @property
     def start_time(self) -> time | None:
-        """Roller is online."""
+        """Return start time."""
         return self._start_time
 
     async def set_start_time(self, value: time) -> None:
         """Set the start time of a cycle."""
-        _LOGGER.warning(f"changing start time from {self._start_time} to {value}")
+        _LOGGER.debug(
+            "Changing start time of %s from %s to %s",
+            self.name,
+            self._start_time,
+            value,
+        )
         self._start_time = value
 
     async def start_irrigation(self, value: timedelta) -> None:
@@ -177,29 +185,42 @@ class Cycle:
             self._running = True
             time_wait = value.total_seconds()
             if time_wait > 0:
-                _LOGGER.info(f"Irrigation Planned on {self.name} - {value}")
+                _LOGGER.info("Irrigation Planned on %s - %s", self.name, value)
                 await asyncio.sleep(time_wait)
-            _LOGGER.error(f"Irrigation Started on {self.name} - {value}")
-            for name, zone in self._controller.zones.items():
+            _LOGGER.info("Irrigation Started on %s", self.name)
+
+            event_data = {
+                "device_id": self._controller.device_id,
+                "type": "irrigation_started",
+            }
+            self._controller.hass.bus.async_fire(DOMAIN, event_data)
+
+            for _name, zone in self._controller.zones.items():
                 await zone.start_irrigation(timedelta(seconds=5))
                 await asyncio.sleep(4)
-            _LOGGER.info(f"Irrigation Finished")
+            _LOGGER.info("Irrigation Finished")
+
+            event_data = {
+                "device_id": self._controller.device_id,
+                "type": "irrigation_stopped",
+            }
+            self._controller.hass.bus.async_fire(DOMAIN, event_data)
+
             self._running = False
 
         if not self._running:
             self._running_cycle_task = asyncio.create_task(irrigation_task(self))
         else:
-            _LOGGER.info(f"{self.name} is already running.")
-        # self.timer.cancel()
-
-        # self.timer = asyncio.create_task(self.timing())
+            _LOGGER.info("%s is already running.", self.name)
 
     @property
     def next_run(self) -> time:
+        """Return next cycle run."""
         return self._target_time
 
     @property
     def running(self) -> bool:
+        """Return if is cycle running."""
         return self._running
 
     async def timing(self, **kwargs: Any) -> None:
@@ -212,16 +233,17 @@ class Cycle:
             await asyncio.sleep((_target_time - now).total_seconds())
             # if now > _target_time:
             if True:
-                _LOGGER.error(f"hallo ziel: {_target_time} aber: {datetime.now()} ")
-                _LOGGER.error(f"starttime: {self._start_time} ")
+                # _LOGGER.error(f"hallo ziel: {_target_time} aber: {datetime.now()} ")
+                # _LOGGER.error(f"starttime: {self._start_time} ")
                 self._controller.hass.states.async_set("input_boolean.testhelfer", "on")
                 event_data = {
                     "device_id": self._controller.device_id,
                     "type": "irrigation_started",
                 }
-                self._controller.hass.bus.async_fire(DOMAIN, event_data)
+                # self._controller.hass.bus.async_fire(DOMAIN, event_data)
+                _LOGGER.debug("turning on")
                 await asyncio.sleep(30)
-                _LOGGER.error("turning off")
+                _LOGGER.debug("turning off")
 
                 self._controller.hass.states.async_set(
                     "input_boolean.testhelfer", "off"
@@ -230,7 +252,7 @@ class Cycle:
                     "device_id": self._controller.device_id,
                     "type": "irrigation_stopped",
                 }
-                self._controller.hass.bus.async_fire(DOMAIN, event_data)
+                # self._controller.hass.bus.async_fire(DOMAIN, event_data)
 
             #     self._target_time += timedelta(minutes=1)
 
@@ -262,6 +284,7 @@ class Zone:
         entity: str,  # entity to control
         zone_duration: time,
     ) -> None:
+        """Initialize an irrigation zone."""
         self._id = zoneid
         self.name = name
         self.length = zone_duration
@@ -271,11 +294,13 @@ class Zone:
         self.controller = controller
 
     async def set_zone_duration(self, duration: time):
+        """Set the irrigation duration of this zone."""
         self._zone_duration = duration
         await self.controller.publish_updates()
 
     async def start_irrigation(self, duration: timedelta):
-        now = datetime.now()
+        """Start irrigation of this zone."""
+        # now = datetime.now()
         # targeted_time = now + self._zone_duration
         self.controller.hass.states.async_set(self._entity, "on")
         await asyncio.sleep(duration.total_seconds())
@@ -287,4 +312,5 @@ class Zone:
 
     @property
     def duration(self) -> time:
+        """Return the irrigation duration of this zone."""
         return self._zone_duration
