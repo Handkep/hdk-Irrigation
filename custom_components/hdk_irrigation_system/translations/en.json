@@ -1,0 +1,39 @@
+{
+    "config": {
+        "abort": {
+            "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+        },
+        "error": {
+            "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
+            "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
+            "unknown": "[%key:common::config_flow::error::unknown%]"
+        },
+        "step": {
+            "user": {
+                "data": {
+                    "host": "Host",
+                    "name": "Name of this irrigation instance",
+                    "number_of_zones": "Number of Zones",
+                    "number_of_cycles": "Number of Cycles",
+                    "password": "Password"
+                },
+                "description": "Enter the name and the quantity of zones.",
+                "title": "Irrigation System"
+            },
+            "zones": {
+                "data": {
+                    "zone1": "zone1",
+                    "zone2": "zone2",
+                    "zone3": "zone3",
+                    "zone4": "zone4",
+                    "zone5": "zone5",
+                    "zone6": "zone6",
+                    "zone7": "zone7",
+                    "zone8": "zone8",
+                    "zone9": "zone9",
+                    "zone10": "zone10"
+                }
+            }
+        }
+    }
+}
